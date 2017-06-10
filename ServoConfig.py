@@ -3,6 +3,7 @@ import sys
 import RPi.GPIO as GPIO
 import Adafruit_PCA9685
 
+
 def BUSInit():
     GPIO.setmode(GPIO.BOARD)
     GPIO.setup(11, GPIO.OUT)
@@ -12,101 +13,78 @@ def BUSInit():
     pwm.set_pwm_freq(50)
     return pwm
 
-
-def Main():
-    pwm = BUSInit()
+#Write the settings into file
+#Called after AngleConfiguration found best settings
+def Writer(pin,position,var):
     try:
-        i = False
-        with open('ServoConfig.txt', 'w') as conf:
-            print("Servo Pin 0: Maximum angle configuration(arround 500)")
-            while i == False:
-                servo = input("Servo Pin 0 - Input angle: ")
-                if servo == "":
-                    i = True
-                    servoangle = input("Please give the resultating angle (degrees)")
-                    conf.write('Servo Pin 0: \r\n')
-                    conf.write('\r\nMax. Position: ' + servoold)
-                    conf.write('\r\nAngle: ' + servoangle  + '\r\n')
-                    
-                else:
-                    pwm.set_pwm(0,0,int(servo))
-                    servoold = servo
-                    
-            i = False
-            print("Servo Pin 0: Middle angle configuration(arround 350)")
-            while i == False:
-                servo = input("Servo Pin 0 - Input angle: ")
-                if servo == "":
-                    i = True
-                    servoangle = input("Please give the resultating angle (degrees)")
-                    conf.write('Mid. Position: ' + servoold +'\r\n')
-                    conf.write('Angle: ' + servoangle + '\r\n')
-                else:
-                    pwm.set_pwm(0,0,int(servo))
-                    servoold = servo
-                    
-            i = False
-            print("Servo Pin 0: Minimum angle configuration(arround 150)")
-            while i == False:
-                servo = input("Servo Pin 0 - Input angle: ")
-                if servo == "":
-                    i = True
-                    servoangle = input("Please give the resultating angle (degrees)")
-                    conf.write('Min. Position: ' + servoold +'\r\n')
-                    conf.write('Angle: ' + servoangle + '\r\n')
-                    
-                else:
-                    pwm.set_pwm(0,0,int(servo))
-                    servoold = servo
+        with open(file, 'w+') as conf: 
+            conf.write("[PIN %s]: %s position: %s\r\n"%(pin,position,var[0]))
+            conf.write("[PIN %s]: Angle: %s\r\n"%(pin,var[1]))
+            conf.close() #not sure if necessary
+    except IOError as ie:
+        print "Open file not possible: %s"%ie
 
-            i = False
-            print("Servo Pin 1: Maximum angle configuration(arround 500)")
-            while i == False:
-                servo = input("Servo Pin 1 - Input angle: ")
-                if servo == "":
-                    i = True
-                    servoangle = input("Please give the resultating angle (degrees)")
-                    conf.write('Servo Pin 1:\r\n')
-                    conf.write('Max. Position: ' + servoold +'\r\n')
-                    conf.write('Angle: ' + servoangle + '\r\n')
-                else:
-                    pwm.set_pwm(1,0,int(servo))
-                    servoold = servo
+#Adjust the configuration of puls modulation
+#Idea:      iterate through most likely positions automatically
+#           and user have only to press a "stop" button when in
+#           correct position, afterwards fine tuning
+def AngleConfiguration(pin, position):
+    Bool = False
+    while Bool == False:
+        servo = input("[PIN %s]:Input angle: "%pin)
 
-            i = False
-            print("Servo Pin 1: Middle angle configuration(arround 350)")
-            while i == False:
-                servo = input("Servo Pin 1 - Input angle: ")
-                if servo == "":
-                    i = True
-                    servoangle = input("Please give the resultating angle (degrees)")
-                    conf.write('Mid. Position: ' + servoold)
-                    conf.write('Angle: ' + servoangle + '\r\n')
-                else:
-                    pwm.set_pwm(1,0,int(servo))
-                    servoold = servo
-                    
-            i = False
-            print("Servo Pin 1: Minimum angle configuration(arround 150)")
-            while i == False:
-                servo = input("Servo Pin 1 - Input angle:\r\n")
-                if servo == "":
-                    i = True
-                    servoangle = input("Please give the resultating angle (degrees)")
-                    conf.write('Min. Position: ' + servoold +'\r\n')
-                    conf.write('Angle: ' + servoangle + '\r\n')
-                else:
-                    pwm.set_pwm(1,0,int(servo))
-                    servoold = servo
+        print ("Testoutput" + servo)
+        if servo == "":
+            Bool = True
+            servoangle = input("Please give the resultating angle (degrees)")            
+            Writer(pin,position,(servoold,servoangle))            
+        else:
+            pwm.set_pwm(pin,0,int(servo))
+            servoold = servo
+
+#Connect to servomotor of connected pins from pi to and.
+#Idea:  Dynamic by parameter 
+def PinConfiguration():
+    try:
+        with open(file, 'a+') as conf: #filehandle creates file now if not existing
         conf.close()
-        print("Configuration complete!")
-        GPIO.output(11,0)
-        GPIO.cleanup()
-    except KeyboardInterrupt:
-        GPIO.output(11,0)
-        GPIO.cleanup()
-        conf.close()
-        sys.exit()
+            try:       
+                    #PIN0
+                    outputpin = 0
+                    #CallBoundarySetting
+                    print("[PIN %s]: Maximum angle configuration(around 500)"%outputpin)
+                    AngleConfiguration(outputpin,"max")
+                    print("[PIN %s]: Middle angle configuration(around 350)"%outputpin)
+                    AngleConfiguration(outputpin,"middle")                          
+                    print("[PIN %s]: Minimum angle configuration(around 150)"%outputpin)
+                    AngleConfiguration(outputpin,"min")
+                    #PIN1
+                    outputpin = 1
+                    print("[PIN %s]: Maximum angle configuration(around 500)"%outputpin)
+                    AngleConfiguration(outputpin,"max")
+                    print("[PIN %s]: Middle angle configuration(around 350)"%outputpin)
+                    AngleConfiguration(outputpin,"middle")                          
+                    print("[PIN %s]: Minimum angle configuration(around 150)"%outputpin)
+                    AngleConfiguration(outputpin,"min")                       
+                print("Configuration complete!")
+                GPIO.output(11,0)
+                GPIO.cleanup()                
+            except KeyboardInterrupt as ki:
+                print ("Error occured read keyboard input: %s "%ki)
+                GPIO.output(11,0)
+                GPIO.cleanup()
+                conf.close()
+                sys.exit()
+    except IOError:
+        print "Open file not possible"
 
 if __name__ == '__main__':
-    Main()
+    #define bushandle for all            
+    pwm = BUSInit()    
+    #name of file or parameter input
+    file = 'ServoConfig.txt'
+    #define constants to avoid crashing the servomotors
+    UPPER_BOUND = 180
+    LOWER_BOUND = 300
+    
+    PinConfiguration()
